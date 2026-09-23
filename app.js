@@ -609,6 +609,72 @@
         }
         this.render();
       }, { passive: false });
+
+      // Touch Gesture Support for Smartphones & Tablets
+      let initialPinchDist = null;
+
+      this.canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          const rect = this.canvas.getBoundingClientRect();
+          this.mouse.x = e.touches[0].clientX - rect.left;
+          this.mouse.y = e.touches[0].clientY - rect.top;
+          this.mouse.active = true;
+          this.isDragging = true;
+          this.dragStartX = this.mouse.x;
+          this.render();
+        } else if (e.touches.length === 2) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          initialPinchDist = Math.hypot(dx, dy);
+        }
+      }, { passive: true });
+
+      this.canvas.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1) {
+          const rect = this.canvas.getBoundingClientRect();
+          this.mouse.x = e.touches[0].clientX - rect.left;
+          this.mouse.y = e.touches[0].clientY - rect.top;
+          this.mouse.active = true;
+
+          if (this.isDragging) {
+            const deltaX = this.mouse.x - this.dragStartX;
+            const candleWidth = this.width / this.visibleCandlesCount;
+            const shift = Math.round(deltaX / candleWidth);
+            if (shift !== 0) {
+              this.offset = Math.max(0, this.offset - shift);
+              this.dragStartX = this.mouse.x;
+            }
+          }
+          this.render();
+        } else if (e.touches.length === 2 && initialPinchDist) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          const dist = Math.hypot(dx, dy);
+          const diff = dist - initialPinchDist;
+          if (Math.abs(diff) > 10) {
+            if (diff > 0) {
+              this.visibleCandlesCount = Math.max(20, this.visibleCandlesCount - 2);
+            } else {
+              this.visibleCandlesCount = Math.min(130, this.visibleCandlesCount + 2);
+            }
+            initialPinchDist = dist;
+            this.render();
+          }
+        }
+      }, { passive: true });
+
+      this.canvas.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) {
+          this.isDragging = false;
+          initialPinchDist = null;
+          setTimeout(() => {
+            if (!this.isDragging) {
+              this.mouse.active = false;
+              this.render();
+            }
+          }, 2500);
+        }
+      });
     }
 
     render() {
