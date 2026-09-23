@@ -220,7 +220,7 @@
               provider = data.provider || 'Interbank Live Feed';
             }
           }
-        } catch (e1) {}
+        } catch (e1) { }
 
         // 2. Direct Fallback to open.er-api.com
         if (!rate) {
@@ -233,7 +233,7 @@
                 provider = 'Open-ER Global FX';
               }
             }
-          } catch (e2) {}
+          } catch (e2) { }
         }
 
         // 3. Direct Fallback to Frankfurter ECB API
@@ -247,7 +247,7 @@
                 provider = 'ECB Frankfurt Live';
               }
             }
-          } catch (e3) {}
+          } catch (e3) { }
         }
 
         if (rate && !isNaN(rate)) {
@@ -360,7 +360,7 @@
         const rand = (Math.random() - 0.5) * 2;
         const microJump = (Math.random() > 0.94) ? (Math.random() - 0.5) * 4 : 1;
         let delta = rand * asset.volatility * microJump + (Math.random() > 0.7 ? asset.trendBias : -asset.trendBias * 0.8);
-        
+
         // Anchor micro-fluctuations directly to the live real-world interbank exchange rate
         if (assetId === 'EURUSD' && asset.basePrice) {
           delta += (asset.basePrice - asset.price) * 0.04;
@@ -368,7 +368,7 @@
 
         asset.lastPrice = asset.price;
         asset.price = Math.max(asset.price * 0.1, asset.price + delta);
-        
+
         // Spread calculation
         asset.bid = asset.price - asset.spreadAmount / 2;
         asset.ask = asset.price + asset.spreadAmount / 2;
@@ -1324,7 +1324,7 @@
         // Auto Take Profit Evaluation
         if (pos.tpPrice) {
           if ((pos.type === 'BUY' && currentExitPrice >= pos.tpPrice) ||
-              (pos.type === 'SELL' && currentExitPrice <= pos.tpPrice)) {
+            (pos.type === 'SELL' && currentExitPrice <= pos.tpPrice)) {
             this.closePosition(pos.id, '🎯 Take Profit Tersentuh');
             continue;
           }
@@ -1333,7 +1333,7 @@
         // Auto Stop Loss Evaluation
         if (pos.slPrice) {
           if ((pos.type === 'BUY' && currentExitPrice <= pos.slPrice) ||
-              (pos.type === 'SELL' && currentExitPrice >= pos.slPrice)) {
+            (pos.type === 'SELL' && currentExitPrice >= pos.slPrice)) {
             this.closePosition(pos.id, '🛡️ Stop Loss Tersentuh');
             continue;
           }
@@ -1525,9 +1525,9 @@
       if (btnFullscreen) {
         btnFullscreen.addEventListener('click', () => {
           if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(() => {});
+            document.documentElement.requestFullscreen().catch(() => { });
           } else {
-            document.exitFullscreen().catch(() => {});
+            document.exitFullscreen().catch(() => { });
           }
         });
       }
@@ -1792,7 +1792,7 @@
 
       this.headerBalance.textContent = `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       this.headerEquity.textContent = `$${equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      
+
       this.headerFloatingPnL.textContent = `${floatingPnL >= 0 ? '+' : ''}$${floatingPnL.toFixed(2)}`;
       this.headerFloatingPnL.className = `value ${floatingPnL >= 0 ? 'profit' : 'loss'}`;
 

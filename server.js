@@ -37,9 +37,9 @@ function refreshLiveRate() {
           };
           console.log(`[FX SYNC] Live EUR/USD updated: 1 EUR = $${cachedEURUSD.rate} USD`);
         }
-      } catch (e) {}
+      } catch (e) { }
     });
-  }).on('error', () => {});
+  }).on('error', () => { });
 }
 
 // Fetch on startup and every 30s
