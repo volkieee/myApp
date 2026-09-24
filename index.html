@@ -3,574 +3,643 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#07090e">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>APEX TRADER PRO 2.0 | Platform Trading Real-Time Forex & Crypto</title>
+    <title>APEX TRADER | Gamified Crypto & Forex Trading Simulator</title>
     <meta name="description"
-        content="Platform trading profesional real-time dengan Order Book L2, WebSocket live feeds, sistem margin & likuidasi otomatis, deposit & withdraw, dan persistensi IndexedDB.">
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        content="Simulatur trading interaktif bergaya game dengan chart realtime, level XP, bot trading otomatis, breaking news events, dan integrasi Firebase.">
+
+    <!-- Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700;800&display=swap"
         rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+
+    <!-- Stylesheet Murni -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Firebase App & Firestore SDKs (Compat v10 for browser LiveServer) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 </head>
 
 <body>
 
     <!-- ====================================================
-       MARGIN CALL / STOP OUT ALERT BANNER (hidden by default)
+       TOP NAVIGATION & GAME HUD BAR
        ==================================================== -->
-    <div class="margin-call-banner" id="marginCallBanner" style="display:none;">
-        <i class="fa-solid fa-triangle-exclamation"></i>
-        <strong>MARGIN CALL!</strong> Tambah dana atau tutup posisi untuk menghindari likuidasi!
-    </div>
-
-    <!-- ====================================================
-       TOP NAVIGATION / TICKER BAR
-       ==================================================== -->
-    <header class="header-bar" id="mainHeader">
-        <div class="logo-group" id="brandLogo">
+    <header class="header-bar">
+        <!-- Logo Section -->
+        <div class="brand-section">
             <div class="logo-badge">
-                <i class="fa-solid fa-chart-line"></i>
+                <i class="fa-solid fa-gamepad"></i>
             </div>
-            <div class="logo-text-box">
+            <div class="brand-text">
                 <h1>APEX TRADER</h1>
-                <div class="logo-sub">Pro 2.0 · TypeScript</div>
+                <div class="brand-tag">SIMULATOR GAME EDITION</div>
             </div>
         </div>
 
-        <!-- Quick Asset Ticker Carousel -->
-        <div class="market-ticker-carousel" id="assetTickerCarousel">
-            <!-- Rendered by header.ui.ts -->
-        </div>
-
-        <!-- Live Feed Status -->
-        <div class="live-market-sync" id="liveSyncStatus" title="Terhubung ke Live Market Feed">
-            <span class="sync-pulse"></span>
-            <span class="sync-label">LIVE:</span>
-            <span class="sync-val" id="syncText">Menghubungkan ke feed...</span>
-        </div>
-
-        <!-- Live Account Summary Chips -->
-        <div class="header-portfolio-summary">
-            <div class="stat-pill">
-                <span class="label">Saldo</span>
-                <span class="value" id="headerBalance">$10,000.00</span>
+        <!-- Player Level & XP HUD -->
+        <div class="player-hud">
+            <div class="rank-badge" id="userRankBadge">
+                <span>🌱 Novice Trader</span> (Lv. 1)
             </div>
-            <div class="stat-pill">
-                <span class="label">Ekuitas</span>
-                <span class="value" id="headerEquity">$10,000.00</span>
+            <div class="xp-container">
+                <div class="xp-label">
+                    <span>XP</span>
+                    <span id="xpText">0 / 100 XP (0%)</span>
+                </div>
+                <div class="xp-bar-bg">
+                    <div class="xp-bar-fill" id="xpProgressBar" style="width: 0%"></div>
+                </div>
             </div>
-            <div class="stat-pill">
-                <span class="label">Float PnL</span>
-                <span class="value" id="headerFloatingPnL">$0.00</span>
-            </div>
-            <div class="stat-pill">
-                <span class="label">Free Margin</span>
-                <span class="value" id="headerFreeMargin">$10,000.00</span>
-            </div>
-            <!-- Margin Level (only visible when positions are open) -->
-            <div class="stat-pill margin-level-pill" id="headerMarginLevel" style="display:none;">
-                <span class="label">Margin Lvl</span>
+            <div class="streak-badge" id="winStreakBadge" style="display: none;">
+                🔥 Streak: <strong>0x</strong>
             </div>
         </div>
 
-        <!-- Controls -->
-        <div class="header-controls">
-            <button class="btn-icon-header" id="btnToggleSound" title="Beralih Suara Efek">
+        <!-- Balance & Action Tools -->
+        <div class="header-actions">
+            <!-- Account Balance -->
+            <div class="balance-chip" id="balanceChip">
+                <span class="balance-label">Cash Game Balance</span>
+                <span class="balance-value" id="userBalance">$10,000.00</span>
+            </div>
+
+            <!-- Database Status Indicator -->
+            <div class="db-badge local" id="dbStatusBadge" title="Klik untuk konfigurasi Firebase">
+                <i class="fa-solid fa-hard-drive"></i> Local Mode
+            </div>
+
+            <!-- Leaderboard Sultan Button -->
+            <button class="btn-icon" id="btnOpenLeaderboardModal" title="🏆 Leaderboard Sultan (Paling Kaya)"
+                style="color: var(--gold);">
+                <i class="fa-solid fa-ranking-star"></i>
+            </button>
+
+            <!-- Tutorial / Game Guide Button -->
+            <button class="btn-icon" id="btnOpenTutorialModal" title="📖 Panduan & Tutorial Cara Main Game">
+                <i class="fa-solid fa-circle-question"></i>
+            </button>
+
+            <!-- Shop / Perk Upgrade Button -->
+            <button class="btn-icon" id="btnOpenShopModal" title="Toko Perk & Upgrade Bot">
+                <i class="fa-solid fa-cart-shopping"></i>
+            </button>
+
+            <!-- Quests / Achievements Button -->
+            <button class="btn-icon" id="btnOpenQuestsModal" title="Quests & Hadiah">
+                <i class="fa-solid fa-trophy"></i>
+            </button>
+
+            <!-- Player Profile & Switch Account Button -->
+            <button class="btn-icon profile-chip-btn" id="btnOpenProfileModal" title="Profil Akun & Kelola User">
+                <span id="headerAvatarIcon" style="font-size:1.15rem; line-height:1;">👑</span>
+                <span id="headerUsernameLabel"
+                    style="font-size:0.75rem; font-weight:700; margin-left:4px; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Akun</span>
+            </button>
+
+            <!-- Trigger Random News Shock Event -->
+            <button class="btn-icon" id="btnTriggerNewsEvent" title="Picu Kejutan Berita Pasar (Pump/Dump Event!)"
+                style="color: var(--gold);">
+                <i class="fa-solid fa-bolt"></i>
+            </button>
+
+            <!-- Audio Toggle Button -->
+            <button class="btn-icon" id="btnToggleAudio" title="Nyalakan/Matikan Suara">
                 <i class="fa-solid fa-volume-high"></i>
             </button>
-            <button class="btn-icon-header" id="btnToggleFullscreen" title="Layar Penuh">
-                <i class="fa-solid fa-expand"></i>
-            </button>
-            <!-- Wallet / Fund Manager Button -->
-            <button class="btn-wallet-header" id="btnOpenWallet" title="Kelola Dana: Deposit & Penarikan">
-                <i class="fa-solid fa-wallet"></i> Dana
-            </button>
-            <button class="btn-reset-account" id="btnOpenResetModal" title="Reset Akun ke $10,000">
-                <i class="fa-solid fa-rotate-left"></i> Reset
+
+            <!-- Reset Balance Button -->
+            <button class="btn-icon" id="btnResetFunds" title="Reset Saldo ke $10,000">
+                <i class="fa-solid fa-rotate-left"></i>
             </button>
         </div>
     </header>
 
     <!-- ====================================================
-       MAIN TRADING WORKSPACE
+       BREAKING NEWS BANNER
        ==================================================== -->
-    <main class="main-workspace">
+    <div class="breaking-news-bar" id="breakingNewsBanner">
+        <span class="news-tag">BREAKING NEWS</span>
+        <span id="breakingNewsText">Pasar sedang berjalan normal.</span>
+    </div>
 
-        <!-- LEFT/CENTER: CHART + ORDER BOOK PANEL -->
-        <section class="chart-card" id="chartSection">
-            <!-- Chart Top Bar -->
-            <div class="chart-header-bar">
-                <div class="active-asset-info">
-                    <div class="asset-badge">
-                        <span id="activeAssetSymbol">EUR/USD</span>
-                        <span class="asset-type-tag" id="activeAssetCategory">Forex</span>
-                        <span class="live-feed-chip" id="liveFeedChip">
-                            <i class="fa-solid fa-satellite-dish"></i> Live Feed
-                        </span>
-                    </div>
-                    <div class="live-price-group">
-                        <span class="current-market-price" id="activeAssetPrice">1.14630</span>
-                        <span class="current-market-change up" id="activeAssetChange">+0.00%</span>
-                    </div>
-                    <div class="ohlc-status-bar" id="ohlcBar">
-                        <span>O: <b id="barOpen">–</b></span>
-                        <span>H: <b id="barHigh">–</b></span>
-                        <span>L: <b id="barLow">–</b></span>
-                        <span>C: <b id="barClose">–</b></span>
+    <!-- AI Bot Earnings Flash Indicator -->
+    <div class="bot-flash" id="botEarningsFlash">+$30 (AI Bot)</div>
+
+    <!-- ====================================================
+       MAIN APPLICATION LAYOUT
+       ==================================================== -->
+    <main class="app-layout">
+
+        <!-- 1. LEFT SIDEBAR: Asset List & Sentiment Radar -->
+        <aside class="sidebar-left">
+            <div class="panel-header">
+                <span>Daftar Pasar</span>
+                <i class="fa-solid fa-layer-group"></i>
+            </div>
+
+            <div class="asset-list" id="assetListContainer">
+                <!-- Diisi otomatis oleh ui.js -->
+            </div>
+
+            <div class="oracle-box">
+                <div class="oracle-title">
+                    <i class="fa-solid fa-satellite-dish"></i>
+                    <span>Market Radar Sentiment</span>
+                </div>
+                <div class="sentiment-gauge-bg">
+                    <div class="sentiment-gauge-fill" id="sentimentGaugeFill"></div>
+                </div>
+                <div class="sentiment-label" id="sentimentLabel">NEUTRAL / RANGING</div>
+            </div>
+        </aside>
+
+        <!-- 2. CENTER VIEWPORT: Realtime Interactive Chart -->
+        <section class="viewport-center">
+            <div class="chart-header-hud">
+                <div class="ticker-hero">
+                    <div class="hero-price" id="heroCurrentPrice" data-prev="0">$0.00</div>
+                    <div class="badge-change up" id="heroPriceChange">+0.00%</div>
+                    <div class="hero-stats">
+                        <div>High: <span id="heroHigh24">$0.00</span></div>
+                        <div>Low: <span id="heroLow24">$0.00</span></div>
                     </div>
                 </div>
 
-                <!-- Timeframe & Indicators -->
-                <div class="chart-controls-group">
-                    <div class="segmented-control" id="timeframeSelector">
-                        <button class="seg-btn active" data-tf="1s">1s</button>
-                        <button class="seg-btn" data-tf="5s">5s</button>
-                        <button class="seg-btn" data-tf="15s">15s</button>
-                        <button class="seg-btn" data-tf="1m">1m</button>
-                        <button class="seg-btn" data-tf="5m">5m</button>
+                <div class="chart-controls">
+                    <!-- Timeframes -->
+                    <div class="btn-group">
+                        <button class="tf-btn" data-tf="1s">1s</button>
+                        <button class="tf-btn active" data-tf="5s">5s</button>
+                        <button class="tf-btn" data-tf="15s">15s</button>
+                        <button class="tf-btn" data-tf="1m">1m</button>
                     </div>
-                    <button class="indicator-toggle-btn active" id="btnToggleEMA" title="EMA 9 & EMA 21">
-                        <i class="fa-solid fa-wave-square"></i> EMA
+
+                    <!-- Chart Type -->
+                    <button class="btn-chart-tool" id="btnToggleChartType" title="Ganti tampilan grafik">
+                        <i class="fa-solid fa-chart-candlestick"></i> Candles
                     </button>
-                    <button class="indicator-toggle-btn active" id="btnToggleBB" title="Bollinger Bands">
-                        <i class="fa-solid fa-chart-area"></i> BB
-                    </button>
-                    <button class="indicator-toggle-btn" id="btnToggleRSI" title="RSI (14)">
-                        <i class="fa-solid fa-chart-line"></i> RSI
+
+                    <!-- Simulation Speed -->
+                    <button class="btn-chart-tool" id="btnSimSpeed" title="Kecepatan simulasi pergerakan pasar">
+                        <i class="fa-solid fa-forward"></i> Speed: 1x
                     </button>
                 </div>
             </div>
 
-            <!-- Candlestick Chart Canvas -->
-            <div class="chart-viewport-wrapper" id="chartViewport">
-                <canvas id="candlestickCanvas"></canvas>
-                <div class="candle-timer-overlay" id="candleTimerOverlay">
-                    <span class="pulse-dot"></span>
-                    <span>Candle: <b id="candleCountdown">1s</b></span>
-                </div>
-            </div>
-
-            <!-- RSI Sub-chart -->
-            <div class="rsi-panel-wrapper" id="rsiPanelWrapper" style="display:none;">
-                <span class="rsi-label-tag">RSI (14): <b id="rsiValue">50.0</b></span>
-                <canvas id="rsiCanvas"></canvas>
-            </div>
-
-            <!-- Live Order Book L2 (Depth of Market) -->
-            <div class="order-book-wrapper" id="orderBookContainer">
-                <!-- Rendered by orderBook.renderer.ts -->
+            <!-- Canvas Chart Area -->
+            <div class="chart-container">
+                <canvas id="tradingChartCanvas"></canvas>
             </div>
         </section>
 
-        <!-- RIGHT: ORDER EXECUTION TERMINAL -->
-        <aside class="order-terminal-card" id="orderTerminal">
-            <div class="terminal-title-bar">
-                <h2><i class="fa-solid fa-bolt text-cyan"></i> Order Terminal</h2>
-                <span class="badge-market"><i class="fa-solid fa-circle text-green fa-2xs"></i> Pasar Aktif</span>
+        <!-- 3. RIGHT SIDEBAR: Order Execution & Live Order Book -->
+        <aside class="sidebar-right">
+            <div class="order-type-tabs">
+                <button class="tab-order-type long active" id="btnOrderLong">
+                    <i class="fa-solid fa-arrow-trend-up"></i> BUY / LONG
+                </button>
+                <button class="tab-order-type short" id="btnOrderShort">
+                    <i class="fa-solid fa-arrow-trend-down"></i> SELL / SHORT
+                </button>
             </div>
 
-            <!-- Live Bid & Ask -->
-            <div class="quote-boxes-grid">
-                <div class="quote-box sell-box" id="quoteSellBox">
-                    <div class="quote-label">SELL (Bid)</div>
-                    <div class="quote-val" id="quoteBidPrice">–</div>
+            <div class="order-form-body">
+                <!-- Leverage Slider / Buttons -->
+                <div>
+                    <div class="form-label">
+                        <span>Pilih Leverage</span>
+                        <span id="labelMaxLev">Maks. Rank</span>
+                    </div>
+                    <div class="leverage-selector">
+                        <button class="lev-btn" data-lev="1">1x</button>
+                        <button class="lev-btn" data-lev="5">5x</button>
+                        <button class="lev-btn active" data-lev="10">10x</button>
+                        <button class="lev-btn" data-lev="25">25x</button>
+                        <button class="lev-btn" data-lev="50">50x</button>
+                        <button class="lev-btn" data-lev="75">75x</button>
+                        <button class="lev-btn" data-lev="100">100x</button>
+                    </div>
                 </div>
-                <div class="quote-box buy-box" id="quoteBuyBox">
-                    <div class="quote-label">BUY (Ask)</div>
-                    <div class="quote-val" id="quoteAskPrice">–</div>
-                </div>
-                <div class="spread-tag" id="quoteSpreadTag">Spread: –</div>
-            </div>
 
-            <!-- Leverage Selector -->
-            <div class="order-field-group">
-                <div class="field-label-row">
-                    <span>Leverage</span>
-                    <span class="info-val" id="displayLeverageVal">10x</span>
+                <!-- Margin Input -->
+                <div>
+                    <div class="form-label">
+                        <span>Margin Modal (USD)</span>
+                    </div>
+                    <div class="input-with-currency">
+                        <span>$</span>
+                        <input type="number" id="inputMarginAmount" value="100" min="1" step="10">
+                    </div>
                 </div>
-                <div class="leverage-pills" id="leveragePills">
-                    <button class="lev-btn" data-lev="1">1x</button>
-                    <button class="lev-btn" data-lev="5">5x</button>
-                    <button class="lev-btn active" data-lev="10">10x</button>
-                    <button class="lev-btn" data-lev="25">25x</button>
-                    <button class="lev-btn" data-lev="50">50x</button>
-                    <button class="lev-btn" data-lev="100">100x</button>
-                </div>
-            </div>
 
-            <!-- Margin Input -->
-            <div class="order-field-group">
-                <div class="field-label-row">
-                    <span>Modal / Margin</span>
-                    <span class="info-val">Maks: <b id="displayMaxMargin">$10,000</b></span>
-                </div>
-                <div class="input-with-currency">
-                    <span class="currency-prefix">$</span>
-                    <input type="number" id="inputOrderMargin" class="trading-input" value="100" min="1" step="10">
-                </div>
-                <div class="quick-pct-row">
+                <!-- Quick Percentage Buttons -->
+                <div class="pct-selector">
                     <button class="pct-btn" data-pct="10">10%</button>
                     <button class="pct-btn" data-pct="25">25%</button>
                     <button class="pct-btn" data-pct="50">50%</button>
                     <button class="pct-btn" data-pct="100">MAX</button>
                 </div>
-            </div>
 
-            <!-- TP & SL -->
-            <div class="tpsl-container">
-                <div class="tpsl-box">
-                    <div class="tpsl-header">
-                        <label class="tp-label"><i class="fa-solid fa-bullseye"></i> Take Profit</label>
+                <!-- Calculation Summary -->
+                <div class="order-calc-card">
+                    <div class="calc-row">
+                        <span>Ukuran Posisi:</span>
+                        <span id="calcPositionValue">$1,000.00</span>
                     </div>
-                    <input type="number" id="inputTakeProfit" class="tpsl-input" placeholder="Opsional (Harga)"
-                        step="any">
-                </div>
-                <div class="tpsl-box">
-                    <div class="tpsl-header">
-                        <label class="sl-label"><i class="fa-solid fa-shield-halved"></i> Stop Loss</label>
+                    <div class="calc-row">
+                        <span>Estimasi Likuidasi:</span>
+                        <span class="liq-price" id="calcEstLiq">$0.00</span>
                     </div>
-                    <input type="number" id="inputStopLoss" class="tpsl-input" placeholder="Opsional (Harga)"
-                        step="any">
                 </div>
-            </div>
 
-            <!-- Position Sizing Breakdown -->
-            <div class="order-cost-breakdown">
-                <div class="cost-row">
-                    <span>Nilai Posisi:</span>
-                    <span class="val" id="calcPositionValue">$1,000.00</span>
-                </div>
-                <div class="cost-row">
-                    <span>Est. Liq. (Buy):</span>
-                    <span class="val" id="calcEstLiqBuy">–</span>
-                </div>
-                <div class="cost-row">
-                    <span>Est. Liq. (Sell):</span>
-                    <span class="val" id="calcEstLiqSell">–</span>
-                </div>
-            </div>
-
-            <!-- BUY / SELL Execution -->
-            <div class="order-action-buttons">
-                <button class="btn-trade-action btn-sell" id="btnExecuteSell">
-                    <span><i class="fa-solid fa-arrow-trend-down"></i> SELL</span>
-                    <span class="sub-text" id="btnSellSubPrice">Short –</span>
-                </button>
-                <button class="btn-trade-action btn-buy" id="btnExecuteBuy">
-                    <span><i class="fa-solid fa-arrow-trend-up"></i> BUY</span>
-                    <span class="sub-text" id="btnBuySubPrice">Long –</span>
+                <!-- Execute Button -->
+                <button class="btn-execute" id="btnExecuteTrade">
+                    <i class="fa-solid fa-bolt-lightning"></i> BUKA POSISI SEKARANG
                 </button>
             </div>
 
-            <!-- Quick Wallet Links in Terminal -->
-            <div class="terminal-wallet-links">
-                <button class="btn-terminal-wallet" id="btnOpenDeposit">
-                    <i class="fa-solid fa-plus-circle"></i> Deposit
-                </button>
-                <button class="btn-terminal-wallet danger" id="btnOpenWithdraw">
-                    <i class="fa-solid fa-minus-circle"></i> Withdraw
-                </button>
+            <!-- Live Mini Order Book -->
+            <div class="order-book-mini">
+                <div class="ob-header">
+                    <span>Order Book L2</span>
+                    <span>Vol</span>
+                </div>
+                <div class="ob-list asks" id="orderBookAsks"></div>
+                <div class="ob-list bids" id="orderBookBids"></div>
             </div>
         </aside>
 
-        <!-- BOTTOM DOCK: POSITIONS, HISTORY, STATS -->
-        <section class="data-dock-card" id="dataDock">
-            <div class="dock-header-nav">
-                <div class="dock-tabs" id="dockTabs">
-                    <button class="dock-tab-btn active" data-tab="tabPositions">
-                        <i class="fa-solid fa-layer-group"></i> Posisi Terbuka
-                        <span class="badge-count" id="badgeOpenPositionsCount">0</span>
+        <!-- 4. BOTTOM PANEL: Active Positions & History -->
+        <section class="viewport-bottom">
+            <div class="bottom-tabs-header">
+                <div class="tabs-group">
+                    <button class="tab-bottom active" id="tabActivePositions">
+                        <i class="fa-solid fa-receipt"></i> Posisi Terbuka <span class="badge-count"
+                            id="openPositionsCount">0</span>
                     </button>
-                    <button class="dock-tab-btn" data-tab="tabHistory">
-                        <i class="fa-solid fa-clock-rotate-left"></i> Riwayat
-                        <span class="badge-count" id="badgeHistoryCount">0</span>
-                    </button>
-                    <button class="dock-tab-btn" data-tab="tabStats">
-                        <i class="fa-solid fa-chart-pie"></i> Statistik
+                    <button class="tab-bottom" id="tabTradeHistory">
+                        <i class="fa-solid fa-clock-rotate-left"></i> Riwayat Trade
                     </button>
                 </div>
 
-                <div class="dock-actions-right">
-                    <button class="btn-dock-action" id="btnExportCSV">
-                        <i class="fa-solid fa-file-csv"></i> Ekspor CSV
-                    </button>
-                    <button class="btn-dock-action" id="btnClearHistory">
-                        <i class="fa-solid fa-trash-can"></i> Hapus Riwayat
+                <div>
+                    <button class="btn-panic" id="btnPanicCloseAll">
+                        <i class="fa-solid fa-fire-flame-curved"></i> PANIC CLOSE ALL
                     </button>
                 </div>
             </div>
 
-            <div class="dock-content-area">
-                <!-- 1. Open Positions -->
-                <div class="tab-pane active" id="tabPositions">
-                    <div class="data-table-wrapper">
-                        <table class="pro-table" id="tablePositions">
-                            <thead>
-                                <tr>
-                                    <th>Waktu</th>
-                                    <th>Aset</th>
-                                    <th>Arah</th>
-                                    <th>Leverage</th>
-                                    <th>Margin</th>
-                                    <th>Harga Masuk</th>
-                                    <th>Harga Terkini</th>
-                                    <th>Take Profit</th>
-                                    <th>Stop Loss</th>
-                                    <th>PnL ($/%)</th>
-                                    <th>Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody id="positionsTableBody"></tbody>
-                        </table>
-                    </div>
-                    <div class="empty-data-state" id="emptyPositionsState">
-                        <div class="empty-icon"><i class="fa-solid fa-chart-pie"></i></div>
-                        <p>Belum ada posisi terbuka. Eksekusi <b>BUY</b> atau <b>SELL</b> di terminal order!</p>
+            <div class="bottom-content-area">
+                <!-- Active Positions Container -->
+                <div id="activePositionsView">
+                    <div class="positions-grid" id="activePositionsList">
+                        <!-- Diisi otomatis -->
                     </div>
                 </div>
 
-                <!-- 2. Trade History -->
-                <div class="tab-pane" id="tabHistory">
-                    <div class="data-table-wrapper">
-                        <table class="pro-table" id="tableHistory">
-                            <thead>
-                                <tr>
-                                    <th>Waktu Tutup</th>
-                                    <th>Aset</th>
-                                    <th>Arah</th>
-                                    <th>Leverage</th>
-                                    <th>Modal</th>
-                                    <th>Harga Masuk</th>
-                                    <th>Harga Keluar</th>
-                                    <th>PnL ($)</th>
-                                    <th>Return (%)</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="historyTableBody"></tbody>
-                        </table>
-                    </div>
-                    <div class="empty-data-state" id="emptyHistoryState">
-                        <div class="empty-icon"><i class="fa-solid fa-receipt"></i></div>
-                        <p>Belum ada riwayat transaksi. Selesaikan order pertamamu!</p>
-                    </div>
-                </div>
-
-                <!-- 3. Statistics -->
-                <div class="tab-pane" id="tabStats">
-                    <div class="stats-dashboard-grid">
-                        <div class="stat-card" id="cardNetPnL">
-                            <span class="stat-title">Total Net PnL</span>
-                            <span class="stat-big-val" id="statNetPnL">$0.00</span>
-                            <span class="stat-sub" id="statNetPnLPct">Return: 0.00%</span>
-                        </div>
-                        <div class="stat-card win-card">
-                            <span class="stat-title">Win Rate</span>
-                            <span class="stat-big-val" id="statWinRate">0.0%</span>
-                            <span class="stat-sub" id="statWinLossCounts">0 Menang / 0 Kalah</span>
-                        </div>
-                        <div class="stat-card gold-card">
-                            <span class="stat-title">Profit Factor</span>
-                            <span class="stat-big-val" id="statProfitFactor">0.00</span>
-                            <span class="stat-sub" id="statProfitFactorSub">Gross Win vs Loss</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-title">Total Transaksi</span>
-                            <span class="stat-big-val" id="statTotalTrades">0</span>
-                            <span class="stat-sub">Order Selesai</span>
-                        </div>
-                        <div class="stat-card win-card">
-                            <span class="stat-title">Best Trade</span>
-                            <span class="stat-big-val" id="statBestTrade">$0.00</span>
-                            <span class="stat-sub" id="statAvgWin">Rata-rata: $0.00</span>
-                        </div>
-                        <div class="stat-card loss-card">
-                            <span class="stat-title">Worst Trade</span>
-                            <span class="stat-big-val" id="statWorstTrade">$0.00</span>
-                            <span class="stat-sub" id="statAvgLoss">Rata-rata: $0.00</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-title">Max Drawdown</span>
-                            <span class="stat-big-val" id="statMaxDrawdown">0.00%</span>
-                            <span class="stat-sub">Penurunan Puncak</span>
-                        </div>
-                        <div class="stat-card gold-card">
-                            <span class="stat-title">Best Win Streak</span>
-                            <span class="stat-big-val" id="statBestStreak">0</span>
-                            <span class="stat-sub" id="statCurrentStreak">Streak Saat ini: 0</span>
-                        </div>
-                    </div>
-
-                    <!-- Equity Curve -->
-                    <div class="stats-chart-section">
-                        <div class="equity-curve-card">
-                            <h3><i class="fa-solid fa-chart-line text-cyan"></i> Kurva Pertumbuhan Ekuitas (Equity
-                                Curve)</h3>
-                            <div class="equity-canvas-wrapper">
-                                <canvas id="equityCanvas"></canvas>
-                            </div>
-                        </div>
-                        <div class="win-loss-breakdown-card">
-                            <div class="progress-bar-container">
-                                <div class="progress-label-row">
-                                    <span class="val-profit"><i class="fa-solid fa-circle-check"></i> Menang: <b
-                                            id="barWinPct">0%</b></span>
-                                    <span class="val-loss"><i class="fa-solid fa-circle-xmark"></i> Kalah: <b
-                                            id="barLossPct">0%</b></span>
-                                </div>
-                                <div class="dual-progress-bar">
-                                    <div class="progress-win" id="progressWinBar" style="width: 50%;"></div>
-                                    <div class="progress-loss" id="progressLossBar" style="width: 50%;"></div>
-                                </div>
-                            </div>
-                        </div>
+                <!-- Trade History Container -->
+                <div id="tradeHistoryView" style="display: none;">
+                    <div class="history-list" id="tradeHistoryList">
+                        <!-- Diisi otomatis -->
                     </div>
                 </div>
             </div>
         </section>
-
     </main>
 
     <!-- ====================================================
-       WALLET MODAL (Deposit / Withdraw / History)
+       MODAL: ONBOARDING / LOGIN USERNAME & AVATAR
        ==================================================== -->
-    <div class="modal-overlay" id="walletModal">
-        <div class="modal-dialog wallet-dialog">
-            <div class="wallet-modal-header">
-                <div class="wallet-title-group">
-                    <i class="fa-solid fa-wallet text-cyan"></i>
-                    <h3>Manajer Dana Akun</h3>
-                </div>
-                <button class="wallet-close-btn" id="walletModalClose">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
+    <div class="modal" id="loginModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-window" style="max-width: 480px; text-align: center;">
+            <div class="modal-header" style="justify-content: center;">
+                <h3>👑 Masuk / Buat Akun Trader Sultan</h3>
+                <button class="modal-close" style="display: none;"><i class="fa-solid fa-xmark"></i></button>
             </div>
+            <div class="modal-body" style="padding: 24px;">
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+                    Pilih <strong>Logo Avatar</strong> & masukkan <strong>Username</strong> kamu:
+                </p>
 
-            <!-- Wallet Account Summary -->
-            <div class="wallet-account-summary">
-                <div class="wallet-stat">
-                    <span class="ws-label">Saldo Akun</span>
-                    <span class="ws-val text-bull" id="walletCurrentBalance">$10,000.00</span>
+                <!-- Avatar Selection Grid -->
+                <div class="avatar-grid-picker" id="loginAvatarSelector">
+                    <!-- Diisi otomatis oleh ui.js -->
                 </div>
-                <div class="wallet-stat">
-                    <span class="ws-label">Free Margin</span>
-                    <span class="ws-val" id="walletFreeMargin">$10,000.00</span>
-                </div>
-                <div class="wallet-stat">
-                    <span class="ws-label">Margin Dipakai</span>
-                    <span class="ws-val text-bear" id="walletUsedMargin">$0.00</span>
-                </div>
-            </div>
 
-            <!-- Wallet Tabs -->
-            <div class="wallet-tabs">
-                <button class="wallet-tab-btn active" id="walletTabDeposit">
-                    <i class="fa-solid fa-plus-circle"></i> Deposit
-                </button>
-                <button class="wallet-tab-btn" id="walletTabWithdraw">
-                    <i class="fa-solid fa-minus-circle"></i> Penarikan
-                </button>
-                <button class="wallet-tab-btn" id="walletTabHistory">
-                    <i class="fa-solid fa-clock-rotate-left"></i> Riwayat Dana
-                </button>
-            </div>
-
-            <!-- DEPOSIT PANEL -->
-            <div id="walletPanelDeposit">
-                <div class="wallet-form-group">
-                    <label>Jumlah Deposit (USD)</label>
-                    <div class="input-with-currency">
-                        <span class="currency-prefix">$</span>
-                        <input type="number" id="depositAmount" class="trading-input" placeholder="0.00" min="1"
-                            step="100">
+                <form id="loginUsernameForm"
+                    style="display: flex; flex-direction: column; gap: 14px; margin-top: 14px;">
+                    <div class="form-group">
+                        <input type="text" id="loginUsernameInput" placeholder="Ketik username (contoh: sultan_raffi)"
+                            maxlength="20" required
+                            style="text-align: center; font-size: 1.05rem; font-weight: 700; padding: 12px; letter-spacing: 0.5px;">
                     </div>
-                    <div class="deposit-presets">
-                        <button class="deposit-preset-btn" data-amount="100">$100</button>
-                        <button class="deposit-preset-btn" data-amount="500">$500</button>
-                        <button class="deposit-preset-btn" data-amount="1000">$1,000</button>
-                        <button class="deposit-preset-btn" data-amount="5000">$5,000</button>
-                        <button class="deposit-preset-btn" data-amount="10000">$10,000</button>
-                    </div>
-                </div>
-                <div class="wallet-form-group">
-                    <label>Metode Pembayaran</label>
-                    <select id="depositMethod" class="wallet-select">
-                        <option value="Bank Transfer">Transfer Bank</option>
-                        <option value="Credit Card">Kartu Kredit/Debit</option>
-                        <option value="Crypto BTC">Crypto (Bitcoin)</option>
-                        <option value="Crypto USDT">Crypto (USDT)</option>
-                        <option value="E-Wallet">E-Wallet</option>
-                    </select>
-                </div>
-                <button class="btn-wallet-action btn-deposit" id="btnDepositSubmit">
-                    <i class="fa-solid fa-plus-circle"></i> Konfirmasi Deposit
-                </button>
-            </div>
-
-            <!-- WITHDRAW PANEL -->
-            <div id="walletPanelWithdraw" style="display:none;">
-                <div class="wallet-info-note">
-                    <i class="fa-solid fa-info-circle"></i>
-                    Hanya <strong>Free Margin</strong> yang dapat ditarik. Dana yang sedang digunakan sebagai margin
-                    untuk posisi aktif tidak dapat ditarik.
-                </div>
-                <div class="wallet-form-group">
-                    <label>Jumlah Penarikan (USD)</label>
-                    <div class="input-with-currency">
-                        <span class="currency-prefix">$</span>
-                        <input type="number" id="withdrawAmount" class="trading-input" placeholder="0.00" min="1"
-                            step="100">
-                    </div>
-                </div>
-                <div class="wallet-form-group">
-                    <label>Metode Penarikan</label>
-                    <select id="withdrawMethod" class="wallet-select">
-                        <option value="Bank Transfer">Transfer Bank</option>
-                        <option value="Crypto BTC">Crypto (Bitcoin)</option>
-                        <option value="Crypto USDT">Crypto (USDT)</option>
-                        <option value="E-Wallet">E-Wallet</option>
-                    </select>
-                </div>
-                <button class="btn-wallet-action btn-withdraw" id="btnWithdrawSubmit">
-                    <i class="fa-solid fa-minus-circle"></i> Konfirmasi Penarikan
-                </button>
-            </div>
-
-            <!-- HISTORY PANEL -->
-            <div id="walletPanelHistory" style="display:none;">
-                <!-- Rendered dynamically by walletModal.ui.ts -->
+                    <button type="submit" class="btn-execute" style="width: 100%;">
+                        <i class="fa-solid fa-right-to-bracket"></i> MULAI TRADING SULTAN
+                    </button>
+                </form>
             </div>
         </div>
     </div>
 
     <!-- ====================================================
-       RESET CONFIRMATION MODAL
+       MODAL: ITEM & PERK UPGRADE SHOP
        ==================================================== -->
-    <div class="modal-overlay" id="resetModal">
-        <div class="modal-dialog">
-            <h3><i class="fa-solid fa-triangle-exclamation text-bear"></i> Konfirmasi Reset Akun</h3>
-            <p>Apakah Anda yakin ingin mereset portofolio dan saldo awal kembali ke <b>$10,000.00</b>? Semua posisi
-                aktif
-                dan riwayat akan dihapus permanen.</p>
-            <div class="modal-actions">
-                <button class="btn-secondary" id="btnCancelReset">Batal</button>
-                <button class="btn-danger" id="btnConfirmReset">Ya, Reset Akun</button>
+    <div class="modal" id="shopModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3>🛒 Toko Perk & Upgrade Trading</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.8rem; color: var(--text-muted);">Tingkatkan kemampuan trading dan passive income
+                    kamu dengan koin game hasil profit!</p>
+                <div class="shop-grid" id="shopItemsContainer">
+                    <!-- Diisi otomatis oleh ui.js -->
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Toast Container -->
-    <div class="toast-container" id="toastContainer"></div>
+    <!-- ====================================================
+       MODAL: QUESTS & ACHIEVEMENTS
+       ==================================================== -->
+    <div class="modal" id="questsModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3>🏆 Quests & Tantangan Trading</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.8rem; color: var(--text-muted);">Selesaikan quest untuk mendapatkan bonus modal
+                    uang tunai game dan XP melimpah!</p>
+                <div class="quests-list" id="questsContainer" style="display:flex; flex-direction:column; gap:10px;">
+                    <!-- Diisi otomatis oleh ui.js -->
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <!-- App Entry Point (TypeScript via Vite) -->
-    <script type="module" src="/src/index.ts"></script>
+    <!-- ====================================================
+       MODAL: TRADER PROFILE & PERSONAL WEALTH STATS
+       ==================================================== -->
+    <div class="modal" id="profileModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-window" style="max-width: 580px;">
+            <div class="modal-header">
+                <h3>📊 Statistik Kekayaan & Profil Trader</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <!-- User Header Card with Avatar -->
+                <div class="profile-hero-card">
+                    <div class="profile-avatar-large" id="statCurrentAvatar">👑</div>
+                    <div class="profile-hero-info">
+                        <h3 id="statCurrentUsername">@trader</h3>
+                        <div id="statPlayerRank" style="font-size: 0.85rem; font-weight: 700;">🌱 Novice Trader</div>
+                    </div>
+                </div>
 
+                <!-- Ganti Avatar Selector -->
+                <div>
+                    <div class="form-label" style="margin-bottom: 6px;">
+                        <span>Ganti Logo / Avatar Akun:</span>
+                    </div>
+                    <div class="avatar-grid-picker mini" id="profileAvatarSelector">
+                        <!-- Diisi otomatis oleh ui.js -->
+                    </div>
+                </div>
+
+                <!-- Personal Wealth Summary Grid -->
+                <div class="wealth-stats-grid">
+                    <div class="w-stat-card highlight">
+                        <span class="w-label">Total Kekayaan (Net Worth)</span>
+                        <strong class="w-val gold" id="statNetWorth">$10,000.00</strong>
+                    </div>
+                    <div class="w-stat-card">
+                        <span class="w-label">Saldo Tunai Kas</span>
+                        <strong class="w-val green" id="statCashBalance">$10,000.00</strong>
+                    </div>
+                    <div class="w-stat-card">
+                        <span class="w-label">Total Akumulasi Profit</span>
+                        <strong class="w-val green" id="statTotalProfit">+$0.00</strong>
+                    </div>
+                    <div class="w-stat-card">
+                        <span class="w-label">Win Rate</span>
+                        <strong class="w-val" id="statWinRate">0.0%</strong>
+                    </div>
+                    <div class="w-stat-card">
+                        <span class="w-label">Rasio Menang / Kalah</span>
+                        <strong class="w-val" id="statWinLossRatio">0 Menang / 0 Kalah</strong>
+                    </div>
+                    <div class="w-stat-card">
+                        <span class="w-label">Total Trade Dieksekusi</span>
+                        <strong class="w-val" id="statTotalTrades">0</strong>
+                    </div>
+                    <div class="w-stat-card">
+                        <span class="w-label">Profit Terbesar (Single Trade)</span>
+                        <strong class="w-val green" id="statHighestWin">+$0.00</strong>
+                    </div>
+                    <div class="w-stat-card">
+                        <span class="w-label">Penghasilan Pasif AI Bot</span>
+                        <strong class="w-val purple" id="statBotIncome">+$0.00</strong>
+                    </div>
+                </div>
+
+                <div class="w-stat-card full-width">
+                    <span class="w-label">Rekor Win Streak</span>
+                    <strong class="w-val gold" id="statBestStreak">0x Win Streak</strong>
+                </div>
+
+                <!-- Account Management Action Buttons -->
+                <div style="display: flex; gap: 10px; margin-top: 6px;">
+                    <button class="btn-secondary" id="btnSwitchAccount" style="flex: 1; padding: 10px;">
+                        <i class="fa-solid fa-arrows-rotate"></i> Ganti / Buat Akun Lain
+                    </button>
+                    <button class="btn-panic" id="btnDeleteAccount" style="flex: 1; padding: 10px;">
+                        <i class="fa-solid fa-trash-can"></i> Hapus Akun Ini (Reset)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================================================
+       MODAL: GLOBAL LEADERBOARD SULTAN (TOP NET WORTH)
+       ==================================================== -->
+    <div class="modal" id="leaderboardModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-window" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>🏆 Leaderboard Trader Sultan Global</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.8rem; color: var(--text-muted);">
+                    Peringkat seluruh akun trader berdasarkan kekayaan bersih (Net Worth). Bersainglah untuk merebut
+                    mahkota Sultan #1!
+                </p>
+
+                <!-- Podium Top 3 Sultans -->
+                <div class="podium-container" id="leaderboardPodium">
+                    <!-- Diisi otomatis oleh ui.js -->
+                </div>
+
+                <!-- Leaderboard Full List -->
+                <div class="leaderboard-list" id="leaderboardListContainer">
+                    <!-- Diisi otomatis oleh ui.js -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================================================
+       MODAL: GAME TUTORIAL & HOW TO PLAY
+       ==================================================== -->
+    <div class="modal" id="tutorialModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-window" style="max-width: 620px;">
+            <div class="modal-header">
+                <h3>📖 Panduan & Tutorial Cara Main Game</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" style="gap: 16px;">
+                <div class="tutorial-card">
+                    <div class="t-icon">🟢 🔴</div>
+                    <div>
+                        <h4>1. Long (Beli) vs Short (Jual)</h4>
+                        <p>Pilih <strong>BUY / LONG</strong> jika kamu yakin harga akan naik. Pilih <strong>SELL /
+                                SHORT</strong> jika kamu memprediksi harga akan turun. Dapatkan profit saat tebakanmu
+                            benar!</p>
+                    </div>
+                </div>
+
+                <div class="tutorial-card">
+                    <div class="t-icon">⚡ 💥</div>
+                    <div>
+                        <h4>2. Leverage & Resiko Likuidasi</h4>
+                        <p>Leverage melipatgandakan profit kamu (1x s.d 100x)! Tapi hati-hati: semakin besar leverage,
+                            batas <strong>Harga Likuidasi</strong> semakin dekat. Jika harga menyentuh garis likuidasi,
+                            posisimu akan hangus!</p>
+                    </div>
+                </div>
+
+                <div class="tutorial-card">
+                    <div class="t-icon">🤖 🛒</div>
+                    <div>
+                        <h4>3. Toko Perk & Upgrade Bot Pasif</h4>
+                        <p>Beli <strong>AI Auto-Trader Bot</strong> di toko perk untuk menghasilkan uang pasif setiap 3
+                            detik. Beli juga <strong>Stop Loss Insurance</strong> agar modalmu dikembalikan saat
+                            terlikuidasi!</p>
+                    </div>
+                </div>
+
+                <div class="tutorial-card">
+                    <div class="t-icon">🚨 🌊</div>
+                    <div>
+                        <h4>4. Breaking News & Shockwaves</h4>
+                        <p>Perhatikan notifikasi <em>Breaking News</em> yang muncul di atas layar! Berita positif akan
+                            memicu <strong>PUMP</strong> gila-gilaan, sedangkan berita negatif memicu
+                            <strong>DUMP</strong> tajam. Manfaatkan momentumnya!
+                        </p>
+                    </div>
+                </div>
+
+                <div class="tutorial-card">
+                    <div class="t-icon">👑 💰</div>
+                    <div>
+                        <h4>5. Jadi Sultan Nomor #1 Global</h4>
+                        <p>Kumpulkan saldo kas terbanyak dan raih posisi puncak di <strong>Leaderboard Sultan</strong>
+                            agar namamu terpampang di hadapan trader seluruh dunia!</p>
+                    </div>
+                </div>
+
+                <button class="btn-execute modal-close" style="width: 100%; margin-top: 4px;">
+                    <i class="fa-solid fa-play"></i> SAYA SIAP TRADING!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================================================
+       MODAL: FIREBASE DATABASE SETUP
+       ==================================================== -->
+    <div class="modal" id="firebaseModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3>🔥 Pengaturan Database Firebase</h3>
+                <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.8rem; color: var(--text-muted);">
+                    Secara default game menggunakan <strong>LocalStorage</strong> sehingga langsung jalan di Live
+                    Server. Jika ingin sinkronisasi cloud dengan Firebase Firestore, masukkan konfigurasi Firebase kamu
+                    di bawah ini:
+                </p>
+                <form id="firebaseConfigForm" style="display:flex; flex-direction:column; gap:10px;">
+                    <div class="form-group">
+                        <label>apiKey</label>
+                        <input type="text" id="fbApiKey" placeholder="AIzaSy...">
+                    </div>
+                    <div class="form-group">
+                        <label>authDomain</label>
+                        <input type="text" id="fbAuthDomain" placeholder="your-app.firebaseapp.com">
+                    </div>
+                    <div class="form-group">
+                        <label>projectId</label>
+                        <input type="text" id="fbProjectId" placeholder="your-project-id">
+                    </div>
+                    <div class="form-group">
+                        <label>storageBucket</label>
+                        <input type="text" id="fbStorageBucket" placeholder="your-app.appspot.com">
+                    </div>
+                    <div class="form-group">
+                        <label>appId</label>
+                        <input type="text" id="fbAppId" placeholder="1:123456789:web:abcdef">
+                    </div>
+                    <div style="display:flex; gap:10px; margin-top:8px;">
+                        <button type="submit" class="btn-submit-fb" style="flex:1;">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> Simpan & Koneksikan
+                        </button>
+                        <button type="button" class="btn-secondary" id="btnClearFirebase">
+                            Reset ke Local
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================================================
+       MODAL: LEVEL UP CELEBRATION
+       ==================================================== -->
+    <div class="modal" id="levelUpModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-window" style="text-align:center; padding:30px 20px;">
+            <div style="font-size:3rem; margin-bottom:10px;">🎉</div>
+            <h2 id="modalNewLevel" style="font-size:1.8rem; color:var(--primary); font-weight:900;">LEVEL 2!</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-top:6px;">Selamat! Pangkat trading kamu
+                meningkat menjadi:</p>
+            <div id="modalNewRank" style="font-size:1.1rem; font-weight:800; color:var(--gold); margin:12px 0;">🌱
+                Novice Trader</div>
+            <p style="font-size:0.8rem; color:var(--bull); margin-bottom:20px;">Bonus Naik Level: <strong>+Uang Tunai
+                    Cash Tambahan!</strong></p>
+            <button class="btn-execute modal-close" style="width:100%;">LANJUTKAN TRADING</button>
+        </div>
+    </div>
+
+    <!-- Main ES Module Entry Point -->
+    <script type="module" src="js/app.js"></script>
 </body>
 
 </html>
