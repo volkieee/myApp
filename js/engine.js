@@ -116,8 +116,16 @@ export class TradingEngine {
             const pData = this.prices[sym];
             const sentimentMod = eventManager.getSentimentModifier(sym);
 
-            // Random walk with mean reversion and news sentiment modifier
-            const randFactor = (Math.random() - 0.495) + (sentimentMod * 0.35);
+            // Realistic random walk with volatility spikes, micro-wicks and fakeouts
+            const isSpikeTick = Math.random() < 0.12; // 12% chance of micro volatility spike / wick
+            const spikeMultiplier = isSpikeTick ? (Math.random() * 2.5 + 1.2) : 1.0;
+            
+            // Trend momentum & Sentiment + noise
+            if (!pData.trendBias || Math.random() < 0.08) {
+                pData.trendBias = (Math.random() - 0.5) * 0.8; // Semi-persistent trend bias
+            }
+            const noise = (Math.random() - 0.498) + (pData.trendBias * 0.3);
+            const randFactor = (noise * spikeMultiplier) + (sentimentMod * 0.45);
             const delta = randFactor * (pData.price * assetConfig.volatility);
 
             pData.prevPrice = pData.price;
@@ -129,17 +137,20 @@ export class TradingEngine {
             const now = Date.now();
             const tfMs = this.getTimeframeSeconds() * 1000;
 
+            // Add realistic high/low wicks during volatility
+            const wickExpansion = isSpikeTick ? Math.abs(delta) * (Math.random() * 1.5 + 0.5) : 0;
+
             if (lastCandle && (now - lastCandle.time) < tfMs) {
                 lastCandle.close = pData.price;
-                if (pData.price > lastCandle.high) lastCandle.high = pData.price;
-                if (pData.price < lastCandle.low) lastCandle.low = pData.price;
-                lastCandle.volume += Math.floor(Math.random() * 2) + 1;
+                if (pData.price + wickExpansion > lastCandle.high) lastCandle.high = pData.price + wickExpansion;
+                if (pData.price - wickExpansion < lastCandle.low) lastCandle.low = Math.max(0.0001, pData.price - wickExpansion);
+                lastCandle.volume += Math.floor(Math.random() * 3) + 1;
             } else {
                 currentCandles.push({
                     time: now,
                     open: pData.price,
-                    high: pData.price,
-                    low: pData.price,
+                    high: pData.price + wickExpansion,
+                    low: Math.max(0.0001, pData.price - wickExpansion),
                     close: pData.price,
                     volume: 1
                 });
@@ -194,8 +205,15 @@ export class TradingEngine {
         if (margin <= 0) return { success: false, msg: "Margin tidak valid" };
         if (game.balance < margin) return { success: false, msg: "Saldo tidak mencukupi!" };
 
+        // Max positions based on trader rank
+        const rankInfo = game.getRankInfo();
+        const maxPositions = rankInfo.level === 1 ? 3 : (rankInfo.level === 2 ? 5 : (rankInfo.level === 3 ? 8 : 12));
+        if (this.positions.length >= maxPositions) {
+            return { success: false, msg: `Maksimal ${maxPositions} posisi terbuka untuk Rank ${rankInfo.name}!` };
+        }
+
         // Max leverage check
-        const maxLev = game.getRankInfo().maxLeverage;
+        const maxLev = rankInfo.maxLeverage;
         if (leverage > maxLev) {
             return { success: false, msg: `Rank kamu saat ini hanya mengizinkan leverage maksimal ${maxLev}x!` };
         }
@@ -205,6 +223,9 @@ export class TradingEngine {
 
         const positionValue = margin * leverage;
         const amount = positionValue / curPrice;
+
+        // Realistic Taker Fee / Spread (0.08% dari nilai total posisi bernilai leverage)
+        const fee = positionValue * 0.0008;
 
         // Liquidation calculation (approx 90% loss of margin)
         const liqDistance = (curPrice / leverage) * 0.9;
@@ -219,9 +240,11 @@ export class TradingEngine {
             margin: margin,
             leverage: leverage,
             amount: amount,
+            fee: fee,
+            holdingFee: 0, // Biaya Funding Rate / Menginap posisi
             liqPrice: liqPrice,
-            pnl: 0,
-            pnlPercent: 0,
+            pnl: -fee, // Mulai dari minus fee transaksi agar realistis (tidak instan profit 0 detik)
+            pnlPercent: -(fee / margin) * 100,
             tpPrice: tpPercent ? (type === 'LONG' ? curPrice * (1 + (tpPercent / (100 * leverage))) : curPrice * (1 - (tpPercent / (100 * leverage)))) : null,
             slPrice: slPercent ? (type === 'LONG' ? curPrice * (1 - (slPercent / (100 * leverage))) : curPrice * (1 + (slPercent / (100 * leverage)))) : null,
             openedAt: new Date().toLocaleTimeString(),
@@ -243,6 +266,10 @@ export class TradingEngine {
             const curPrice = this.getCurrentPrice(pos.symbol);
             pos.currentPrice = curPrice;
 
+            // Biaya Funding Rate bertambah seiring waktu posisi ditahan (0.005% dari nilai leverage per tick)
+            const positionValue = pos.margin * pos.leverage;
+            pos.holdingFee = (pos.holdingFee || 0) + (positionValue * 0.00005);
+
             let priceDiff = 0;
             if (pos.type === 'LONG') {
                 priceDiff = curPrice - pos.entryPrice;
@@ -251,8 +278,12 @@ export class TradingEngine {
             }
 
             const pnlRatio = priceDiff / pos.entryPrice;
-            pos.pnlPercent = pnlRatio * pos.leverage * 100;
-            pos.pnl = pos.margin * (pos.pnlPercent / 100);
+            const grossPnl = pos.margin * pnlRatio * pos.leverage;
+            
+            // Net PnL dikurangi trading fee & holding fee (Funding Rate)
+            const netPnl = grossPnl - pos.fee - pos.holdingFee;
+            pos.pnl = netPnl;
+            pos.pnlPercent = (netPnl / pos.margin) * 100;
 
             // Check Liquidation
             let isLiquidated = false;

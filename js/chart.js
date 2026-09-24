@@ -1,9 +1,9 @@
 /**
- * GAMIFIED INTERACTIVE CANVAS CHART (PAN & ZOOM ENABLED)
+ * GAMIFIED INTERACTIVE CANVAS CHART (FULL 2D PAN & ZOOM ENABLED)
  * =====================================================================
  * Render grafik Candlestick / Area glow realtime dengan performa tinggi.
  * Fitur Interaktif:
- * - 🖱️ Geser / Drag Layar (Pan) ke kiri & ke kanan melihat riwayat harga lampau.
+ * - 🖱️ Geser Bebas 360° (Pan Horizontal & Vertikal: Atas, Bawah, Kiri, Kanan).
  * - 🔍 Zoom In / Zoom Out menggunakan Scroll Wheel mouse & Touch pinch.
  * - ⏩ Tombol & Double Click untuk Recenter kembali ke live price realtime.
  * - 🎯 Indikator Posisi Terbuka, Likuidasi, Partikel FX, dan Crosshair Interaktif.
@@ -22,12 +22,15 @@ export class TradingChart {
         this.width = 0;
         this.height = 0;
 
-        // Pan & Zoom States
-        this.panOffset = 0; // Berapa lilin yang digeser dari ujung kanan
-        this.visibleCount = 55; // Berapa lilin yang tampil di layar (Zoom level: 15 s.d 180)
+        // 2D Pan & Zoom States
+        this.panOffset = 0; // Horizontal Pan (Candles from right)
+        this.verticalPanOffset = 0; // Vertical Pan (Price displacement in USD)
+        this.visibleCount = 55; // Zoom level: 15 s.d 180 candles
         this.isDragging = false;
         this.dragStartX = 0;
-        this.dragStartPan = 0;
+        this.dragStartY = 0;
+        this.dragStartPanX = 0;
+        this.dragStartPanY = 0;
         this.touchStartDist = 0;
 
         this.initCanvas();
@@ -55,7 +58,7 @@ export class TradingChart {
     bindEvents() {
         if (!this.canvas) return;
 
-        // 1. Mouse Move & Crosshair
+        // 1. Mouse Move & Crosshair & 2D Dragging
         this.canvas.addEventListener('mousemove', (e) => {
             const rect = this.canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
@@ -63,31 +66,43 @@ export class TradingChart {
 
             this.hoverPos = { x: mouseX, y: mouseY };
 
-            // Dragging Logic
+            // 2D Dragging Logic (Kiri, Kanan, Atas, Bawah - 1:1 Presisi Nyaman)
             if (this.isDragging) {
-                const chartAreaWidth = this.width - 70;
+                const chartAreaWidth = Math.max(100, this.width - 70);
+                const chartAreaHeight = Math.max(100, this.height - 30);
                 const candleWidth = chartAreaWidth / this.visibleCount;
-                const deltaPixels = e.clientX - this.dragStartX;
-                const candleDelta = Math.round(deltaPixels / candleWidth);
 
+                // Horizontal Delta (X) - 1:1 candle tracking
+                const deltaX = e.clientX - this.dragStartX;
+                const candleDelta = Math.round(deltaX / candleWidth);
                 const maxPan = Math.max(0, (engine.candles[engine.selectedAsset]?.length || 0) - this.visibleCount);
-                this.panOffset = Math.max(0, Math.min(maxPan, this.dragStartPan + candleDelta));
+                this.panOffset = Math.max(0, Math.min(maxPan, this.dragStartPanX + candleDelta));
+
+                // Vertical Delta (Y) - 1:1 price tracking sesuai rentang harga layar saat ini
+                const deltaY = e.clientY - this.dragStartY;
+                const activePriceRange = this.currentPriceRange || (engine.getCurrentPrice() * 0.02) || 50;
+                const pricePerPixel = activePriceRange / chartAreaHeight;
+                
+                // Gerakan 1:1 stabil dan tidak licin
+                this.verticalPanOffset = this.dragStartPanY - (deltaY * pricePerPixel);
             }
 
             this.render();
         });
 
-        // 2. Mouse Down (Start Dragging / Pan)
+        // 2. Mouse Down (Start 2D Pan)
         this.canvas.addEventListener('mousedown', (e) => {
             // Cek jika klik tombol Recenter Live
-            if (this.panOffset > 0 && this.isClickingRecenterBtn(e)) {
+            if ((this.panOffset > 0 || Math.abs(this.verticalPanOffset) > 0.01) && this.isClickingRecenterBtn(e)) {
                 this.recenter();
                 return;
             }
 
             this.isDragging = true;
             this.dragStartX = e.clientX;
-            this.dragStartPan = this.panOffset;
+            this.dragStartY = e.clientY;
+            this.dragStartPanX = this.panOffset;
+            this.dragStartPanY = this.verticalPanOffset;
             this.canvas.style.cursor = 'grabbing';
         });
 
@@ -95,7 +110,7 @@ export class TradingChart {
         const stopDrag = () => {
             if (this.isDragging) {
                 this.isDragging = false;
-                this.canvas.style.cursor = 'crosshair';
+                this.canvas.style.cursor = 'grab';
             }
         };
 
@@ -106,7 +121,7 @@ export class TradingChart {
             this.render();
         });
 
-        // 4. Double Click to Recenter
+        // 4. Double Click to Recenter Both Axes
         this.canvas.addEventListener('dblclick', () => {
             this.recenter();
         });
@@ -114,7 +129,7 @@ export class TradingChart {
         // 5. Mouse Wheel (Zoom In / Zoom Out)
         this.canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
-            const zoomDelta = e.deltaY < 0 ? -5 : 5;
+            const zoomDelta = e.deltaY < 0 ? -4 : 4;
             this.visibleCount = Math.max(15, Math.min(160, this.visibleCount + zoomDelta));
             
             const maxPan = Math.max(0, (engine.candles[engine.selectedAsset]?.length || 0) - this.visibleCount);
@@ -122,12 +137,14 @@ export class TradingChart {
             this.render();
         }, { passive: false });
 
-        // 6. Touch Events untuk Layar HP / Touchscreen
+        // 6. Touch Events untuk Layar HP (2D Touch Pan & Pinch Zoom)
         this.canvas.addEventListener('touchstart', (e) => {
             if (e.touches.length === 1) {
                 this.isDragging = true;
                 this.dragStartX = e.touches[0].clientX;
-                this.dragStartPan = this.panOffset;
+                this.dragStartY = e.touches[0].clientY;
+                this.dragStartPanX = this.panOffset;
+                this.dragStartPanY = this.verticalPanOffset;
             } else if (e.touches.length === 2) {
                 this.isDragging = false;
                 this.touchStartDist = Math.hypot(
@@ -139,20 +156,29 @@ export class TradingChart {
 
         this.canvas.addEventListener('touchmove', (e) => {
             if (e.touches.length === 1 && this.isDragging) {
-                const chartAreaWidth = this.width - 70;
+                const chartAreaWidth = Math.max(100, this.width - 70);
+                const chartAreaHeight = Math.max(100, this.height - 30);
                 const candleWidth = chartAreaWidth / this.visibleCount;
-                const deltaPixels = e.touches[0].clientX - this.dragStartX;
-                const candleDelta = Math.round(deltaPixels / candleWidth);
 
+                // X Delta
+                const deltaX = e.touches[0].clientX - this.dragStartX;
+                const candleDelta = Math.round(deltaX / candleWidth);
                 const maxPan = Math.max(0, (engine.candles[engine.selectedAsset]?.length || 0) - this.visibleCount);
-                this.panOffset = Math.max(0, Math.min(maxPan, this.dragStartPan + candleDelta));
+                this.panOffset = Math.max(0, Math.min(maxPan, this.dragStartPanX + candleDelta));
+
+                // Y Delta
+                const deltaY = e.touches[0].clientY - this.dragStartY;
+                const activePriceRange = this.currentPriceRange || (engine.getCurrentPrice() * 0.02) || 50;
+                const pricePerPixel = activePriceRange / chartAreaHeight;
+                this.verticalPanOffset = this.dragStartPanY - (deltaY * pricePerPixel);
+
                 this.render();
             } else if (e.touches.length === 2) {
                 const curDist = Math.hypot(
                     e.touches[0].clientX - e.touches[1].clientX,
                     e.touches[0].clientY - e.touches[1].clientY
                 );
-                const pinchDelta = (this.touchStartDist - curDist) * 0.15;
+                const pinchDelta = (this.touchStartDist - curDist) * 0.12;
                 this.visibleCount = Math.max(15, Math.min(160, Math.round(this.visibleCount + pinchDelta)));
                 this.touchStartDist = curDist;
                 this.render();
@@ -171,6 +197,7 @@ export class TradingChart {
 
     recenter() {
         this.panOffset = 0;
+        this.verticalPanOffset = 0;
         this.render();
     }
 
@@ -180,7 +207,7 @@ export class TradingChart {
         const y = e.clientY - rect.top;
         const btnX = this.width - 170;
         const btnY = this.height - 55;
-        return (x >= btnX && x <= btnX + 90 && y >= btnY && y <= btnY + 26);
+        return (x >= btnX && x <= btnX + 95 && y >= btnY && y <= btnY + 28);
     }
 
     spawnTradeBurst(type) {
@@ -245,12 +272,17 @@ export class TradingChart {
             if (c.high > maxPrice) maxPrice = c.high;
         });
 
+        // Terapkan Vertical Pan Offset (Geser Atas / Bawah)
+        minPrice -= this.verticalPanOffset;
+        maxPrice -= this.verticalPanOffset;
+
         // Add 12% vertical padding
         const padding = (maxPrice - minPrice) * 0.12 || 1;
         minPrice -= padding;
         maxPrice += padding;
 
         const priceRange = maxPrice - minPrice;
+        this.currentPriceRange = priceRange;
         const chartAreaWidth = this.width - 70;
         const chartAreaHeight = this.height - 30;
 
@@ -421,23 +453,24 @@ export class TradingChart {
             ctx.fillText(hoverPrice.toFixed(decimals), chartAreaWidth + 34, this.hoverPos.y + 3);
         }
 
-        // 6. Floating "Recenter / Live Price" Button if Panned Away
-        if (this.panOffset > 0) {
+        // 6. Floating "Recenter / Live Price" Button if Panned Away (Horizontal or Vertical)
+        const isPanned = this.panOffset > 0 || Math.abs(this.verticalPanOffset) > 0.01;
+        if (isPanned) {
             const btnX = this.width - 170;
             const btnY = this.height - 55;
 
-            ctx.fillStyle = 'rgba(14, 19, 31, 0.85)';
+            ctx.fillStyle = 'rgba(14, 19, 31, 0.9)';
             ctx.strokeStyle = '#38bdf8';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.roundRect(btnX, btnY, 90, 26, 13);
+            ctx.roundRect(btnX, btnY, 95, 28, 14);
             ctx.fill();
             ctx.stroke();
 
             ctx.fillStyle = '#38bdf8';
             ctx.font = 'bold 10px Inter, sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('⏩ LIVE PRICE', btnX + 45, btnY + 17);
+            ctx.fillText('⏩ RECENTER', btnX + 47, btnY + 18);
         }
 
         // 7. Draw Particles

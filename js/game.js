@@ -20,15 +20,6 @@ export const RANKS = [
 
 export const SHOP_ITEMS = [
     {
-        id: "autobot",
-        name: "🤖 AI Auto-Trader Bot",
-        desc: "Bot trading otomatis yang menghasilkan profit pasif setiap 3 detik!",
-        baseCost: 2500,
-        costMultiplier: 1.8,
-        maxLevel: 5,
-        getEffectDesc: (lvl) => lvl === 0 ? "Belum aktif" : `Menghasilkan +$${(lvl * 15).toLocaleString()}/3 detik`
-    },
-    {
         id: "insurance",
         name: "🛡️ Stop Loss Insurance",
         desc: "Mengembalikan sebagian modal jika posisi terkena Likuidasi!",
@@ -73,7 +64,6 @@ export class GameEngine {
         this.avatar = "👑";
         this.resetLocalState();
         this.listeners = [];
-        this.autoBotTimer = null;
     }
 
     resetLocalState() {
@@ -83,7 +73,7 @@ export class GameEngine {
         this.xp = 0;
         this.winStreak = 0;
         this.bestStreak = 0;
-        this.upgrades = { autobot: 0, insurance: 0, oracle: 0 };
+        this.upgrades = { insurance: 0, oracle: 0 };
         this.quests = JSON.parse(JSON.stringify(INITIAL_QUESTS));
         this.stats = {
             totalTrades: 0,
@@ -123,7 +113,6 @@ export class GameEngine {
             this.notifyChange();
         }
 
-        this.startAutoBotLoop();
         this.notifyChange();
         return true;
     }
@@ -237,7 +226,7 @@ export class GameEngine {
         this.level = 1;
         this.xp = 0;
         this.winStreak = 0;
-        this.upgrades = { autobot: 0, insurance: 0, oracle: 0 };
+        this.upgrades = { insurance: 0, oracle: 0 };
         this.quests = JSON.parse(JSON.stringify(INITIAL_QUESTS));
         this.stats = {
             totalTrades: 0,
@@ -356,20 +345,6 @@ export class GameEngine {
         return { success: true, newLevel: this.upgrades[itemId] };
     }
 
-    startAutoBotLoop() {
-        if (this.autoBotTimer) clearInterval(this.autoBotTimer);
-        this.autoBotTimer = setInterval(() => {
-            const botLvl = this.upgrades.autobot || 0;
-            if (botLvl > 0) {
-                const profit = botLvl * 15;
-                this.balance += profit;
-                this.stats.totalProfit += profit;
-                this.stats.botEarnings = (this.stats.botEarnings || 0) + profit;
-                this.addXp(2 * botLvl);
-                window.dispatchEvent(new CustomEvent('apex_bot_profit', { detail: { profit } }));
-            }
-        }, 3000);
-    }
 }
 
 export const game = new GameEngine();
